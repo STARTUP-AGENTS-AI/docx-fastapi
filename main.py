@@ -45,7 +45,7 @@ async def save_script(code: str):
             raise HTTPException(status_code=500, detail=f"Erro ao executar o script: {result.stderr}")
 
         # Aqui você deve definir o caminho do arquivo DOCX gerado pelo script
-        docx_file_path = "documento_revolucao_francesa.docx"  # Substitua pelo caminho real do arquivo DOCX gerado pelo script
+        docx_file_path = "./documento_revolucao_francesa.docx"  # Substitua pelo caminho real do arquivo DOCX gerado pelo script
 
         # Faz upload do arquivo DOCX para o Google Drive
         file_id = upload_to_drive(docx_file_path, os.path.basename(docx_file_path))
