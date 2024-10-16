@@ -44,8 +44,12 @@ async def save_script(code: str):
         if result.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Erro ao executar o script: {result.stderr}")
 
-        # Aqui você deve definir o caminho do arquivo DOCX gerado pelo script
-        docx_file_path = "./documento_revolucao_francesa.docx"  # Substitua pelo caminho real do arquivo DOCX gerado pelo script
+        # Corrige o caminho do arquivo DOCX gerado pelo script
+        docx_file_path = "/tmp/documento_revolucao_francesa.docx"  # Certifique-se de que o arquivo foi salvo em /tmp/
+
+        # Verifica se o arquivo DOCX foi realmente gerado
+        if not os.path.exists(docx_file_path):
+            raise HTTPException(status_code=404, detail="Arquivo DOCX não encontrado após execução do script.")
 
         # Faz upload do arquivo DOCX para o Google Drive
         file_id = upload_to_drive(docx_file_path, os.path.basename(docx_file_path))
@@ -54,3 +58,7 @@ async def save_script(code: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+    finally:
+        # Remove o arquivo temporário do script Python gerado após a execução
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
