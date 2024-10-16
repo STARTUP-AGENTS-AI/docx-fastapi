@@ -1,15 +1,55 @@
 from fastapi import FastAPI, HTTPException
 import os
+import uuid
+import subprocess
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 app = FastAPI()
 
+# Autenticação do Google Drive
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SERVICE_ACCOUNT_FILE = 'path/to/your/service_account.json'  # Altere para o caminho do seu arquivo de conta de serviço
+
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+drive_service = build('drive', 'v3', credentials=credentials)
+
+def upload_to_drive(file_path, file_name):
+    file_metadata = {
+        'name': file_name,
+        'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'  # Tipo MIME para DOCX
+    }
+    media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    return file.get('id')
+
 @app.post("/save_script/")
 async def save_script(code: str):
-    temp_file_path = "/tmp/temp_script.py"  # Caminho do arquivo temporário no Railway
+    # Gera um nome de arquivo aleatório usando UUID
+    file_name = f"{uuid.uuid4()}.py"
+    temp_file_path = f"./{file_name}"  # Caminho do arquivo temporário no Railway
+
     try:
         # Salva o código no arquivo temporário
         with open(temp_file_path, "w") as temp_file:
             temp_file.write(code)
-        return {"message": "Script salvo com sucesso!", "file_path": temp_file_path}
+
+        # Executa o script
+        result = subprocess.run(['python3', temp_file_path], capture_output=True, text=True)
+
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Erro ao executar o script: {result.stderr}")
+
+        # Aqui você deve definir o caminho do arquivo DOCX gerado pelo script
+        docx_file_path = "output_document.docx"  # Substitua pelo caminho real do arquivo DOCX gerado pelo script
+
+        # Faz upload do arquivo DOCX para o Google Drive
+        file_id = upload_to_drive(docx_file_path, os.path.basename(docx_file_path))
+        
+        return {"message": "Script executado e documento enviado com sucesso!", "file_id": file_id}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar o script: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
