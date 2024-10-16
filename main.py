@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 import os
 import uuid
 import subprocess
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -10,10 +11,10 @@ app = FastAPI()
 
 # Autenticação do Google Drive
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-SERVICE_ACCOUNT_FILE = 'path/to/your/service_account.json'  # Altere para o caminho do seu arquivo de conta de serviço
+service_account_info = json.loads(os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON'))
 
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+# Cria as credenciais a partir do dicionário
+credentials = service_account.Credentials.from_service_account_info(service_account_info)
 
 drive_service = build('drive', 'v3', credentials=credentials)
 
