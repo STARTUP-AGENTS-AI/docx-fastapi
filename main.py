@@ -18,8 +18,15 @@ credentials = service_account.Credentials.from_service_account_info(service_acco
 drive_service = build('drive', 'v3', credentials=credentials)
 
 def upload_to_drive(file_path, file_name):
-    file_metadata = {'name': file_name, 'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
+    file_metadata = {
+        'name': file_name,
+        'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }
     media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    
+    # Logando o upload
+    print(f"Fazendo upload do arquivo: {file_path}")
+    
     file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
     return file.get('id')
 
@@ -31,10 +38,12 @@ async def save_script(code: str):
 
     try:
         # Salva o código em uma única linha
+        print("Salvando o código em:", temp_file_path)
         with open(temp_file_path, "w") as temp_file:
             temp_file.write(code.replace("\\n", ";"))  # Usa `;` para separar comandos
 
         # Executa o script
+        print("Executando o script...")
         result = subprocess.run(['python3', temp_file_path], capture_output=True, text=True)
 
         if result.returncode != 0:
@@ -46,6 +55,8 @@ async def save_script(code: str):
         # Verifica se o arquivo DOCX foi realmente gerado
         if not os.path.exists(docx_file_path):
             raise HTTPException(status_code=404, detail="Arquivo DOCX não encontrado após execução do script.")
+        
+        print("Arquivo DOCX encontrado:", docx_file_path)
 
         # Faz upload do arquivo DOCX para o Google Drive
         file_id = upload_to_drive(docx_file_path, os.path.basename(docx_file_path))
@@ -53,8 +64,11 @@ async def save_script(code: str):
         return {"message": "Script executado e documento enviado com sucesso!", "file_id": file_id}
 
     except Exception as e:
+        print("Erro encontrado:", str(e))  # Logando o erro
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+    
     finally:
         # Remove o arquivo temporário do script Python gerado após a execução
         if os.path.exists(temp_file_path):
+            print("Removendo arquivo temporário:", temp_file_path)
             os.remove(temp_file_path)
