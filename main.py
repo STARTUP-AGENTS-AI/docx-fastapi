@@ -61,7 +61,10 @@ async def save_script(code: str):
         # Faz upload do arquivo DOCX para o Google Drive
         file_id = upload_to_drive(docx_file_path, os.path.basename(docx_file_path))
         
-        return {"message": "Script executado e documento enviado com sucesso!", "file_id": file_id}
+        # Construindo o link para o arquivo no Google Drive
+        file_link = f"https://drive.google.com/file/d/{file_id}/view"
+
+        return {"message": "Script executado e documento enviado com sucesso!", "file_link": file_link}
 
     except Exception as e:
         print("Erro encontrado:", str(e))  # Logando o erro
