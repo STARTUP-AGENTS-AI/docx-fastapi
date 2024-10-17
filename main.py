@@ -147,49 +147,44 @@ def upload_pptx_to_drive(file_path, file_name):
 
     return file_id
 
-# Endpoint para salvar um arquivo .pptx com nome dinâmico
+# Endpoint para gerar e salvar um arquivo .pptx
 @app.post("/save_pptx/")
-async def save_pptx(code: str, file_name: str):
+async def save_pptx(slides_content: list, file_name: str):
     # Gera um nome de arquivo temporário para o código Python
-    temp_file_name = f"{uuid.uuid4()}.py"
+    temp_file_name = f"{uuid.uuid4()}.pptx"
     temp_file_path = f"./{temp_file_name}"  # Caminho do arquivo temporário no Railway
 
     try:
-        # Salva o código em uma única linha
-        print("Salvando o código em:", temp_file_path)
-        with open(temp_file_path, "w") as temp_file:
-            temp_file.write(code.replace("\\n", ";"))  # Usa `;` para separar comandos
+        # Cria uma nova apresentação
+        prs = Presentation()
+        
+        # Adiciona slides conforme o conteúdo fornecido
+        for slide_content in slides_content:
+            slide_layout = prs.slide_layouts[0]  # Layout do slide (0 para título e conteúdo)
+            slide = prs.slides.add_slide(slide_layout)
+            title = slide.shapes.title
+            content = slide.placeholders[1]  # Placeholder para o conteúdo do slide
 
-        # Executa o script
-        print("Executando o script...")
-        result = subprocess.run(['python3', temp_file_path], capture_output=True, text=True)
+            title.text = slide_content.get("title", "Título Padrão")
+            content.text = slide_content.get("content", "Conteúdo Padrão")
 
-        if result.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"Erro ao executar o script: {result.stderr}")
-
-        # Caminho do arquivo PPTX gerado pelo script
-        pptx_file_path = f"./{file_name}.pptx"  # Nome dinâmico do arquivo .pptx
-
-        # Verifica se o arquivo PPTX foi realmente gerado
-        if not os.path.exists(pptx_file_path):
-            raise HTTPException(status_code=404, detail="Arquivo PPTX não encontrado após execução do script.")
-
-        print("Arquivo PPTX encontrado:", pptx_file_path)
+        # Salva a apresentação
+        prs.save(temp_file_path)
 
         # Faz upload do arquivo PPTX para o Google Drive
-        file_id = upload_pptx_to_drive(pptx_file_path, file_name)
+        file_id = upload_pptx_to_drive(temp_file_path, file_name)
 
         # Construindo o link para o arquivo no Google Drive
         file_link = f"https://drive.google.com/file/d/{file_id}/view"
 
-        return {"message": "Script executado e apresentação enviada com sucesso!", "file_link": file_link}
+        return {"message": "Apresentação PPTX criada e enviada com sucesso!", "file_link": file_link}
 
     except Exception as e:
         print("Erro encontrado:", str(e))  # Logando o erro
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
     finally:
-        # Remove o arquivo temporário do script Python gerado após a execução
+        # Remove o arquivo temporário do PPTX gerado após a execução
         if os.path.exists(temp_file_path):
             print("Removendo arquivo temporário:", temp_file_path)
             os.remove(temp_file_path)
