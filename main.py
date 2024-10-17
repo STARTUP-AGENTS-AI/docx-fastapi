@@ -89,3 +89,89 @@ async def save_docx(code: str, file_name: str):
         if os.path.exists(temp_file_path):
             print("Removendo arquivo temporário:", temp_file_path)
             os.remove(temp_file_path)
+#-----------------------------------------------------SHEET-------------------------------------------
+# Função para criar uma planilha no Google Sheets
+def create_google_sheet(sheet_name):
+    sheet_metadata = {
+        'properties': {
+            'title': sheet_name
+        }
+    }
+
+    sheet = sheets_service.spreadsheets().create(body=sheet_metadata, fields='spreadsheetId').execute()
+    sheet_id = sheet.get('spreadsheetId')
+
+    # Permissões públicas para leitura
+    drive_service.permissions().create(
+        fileId=sheet_id,
+        body={'type': 'anyone', 'role': 'reader'}
+    ).execute()
+
+    return sheet_id
+
+# Endpoint para criar uma planilha Google Sheets
+@app.post("/create_sheet/")
+async def create_sheet(sheet_name: str):
+    try:
+        # Cria uma planilha no Google Sheets
+        sheet_id = create_google_sheet(sheet_name)
+        file_link = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
+
+        return {"message": "Planilha Google Sheets criada com sucesso!", "file_link": file_link}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+#-----------------------------------------------------PPTX-------------------------------------------
+# Função para criar um arquivo PowerPoint
+def create_powerpoint(title: str, content: str):
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])  # Usar layout de slide em branco
+    title_box = slide.shapes.title
+    content_box = slide.shapes.add_textbox(left=0, top=0, width=Inches(10), height=Inches(7))
+
+    title_box.text = title
+    content_box.text = content
+    pptx_file_path = "apresentacao.pptx"
+    presentation.save(pptx_file_path)
+    return pptx_file_path
+
+# Função para upload de um arquivo .pptx para o Google Drive
+def upload_pptx_to_drive(file_path, file_name):
+    file_metadata = {
+        'name': file_name,
+        'mimeType': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    }
+    media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation')
+
+    print(f"Fazendo upload do arquivo: {file_path}")
+    
+    file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    file_id = file.get('id')
+
+    # Tornar o arquivo público
+    permission = {
+        'type': 'anyone',
+        'role': 'reader',
+    }
+    drive_service.permissions().create(fileId=file_id, body=permission).execute()
+
+    return file_id
+
+# Endpoint para criar um arquivo PPTX
+@app.post("/create_pptx/")
+async def create_pptx(title: str, content: str):
+    try:
+        # Cria a apresentação PowerPoint
+        pptx_file_path = create_powerpoint(title, content)
+        
+        # Faz upload do arquivo PPTX para o Google Drive
+        file_id = upload_pptx_to_drive(pptx_file_path, os.path.basename(pptx_file_path))
+
+        # Construindo o link para o arquivo no Google Drive
+        file_link = f"https://drive.google.com/file/d/{file_id}/view"
+
+        return {"message": "Apresentação PowerPoint criada e enviada com sucesso!", "file_link": file_link}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
