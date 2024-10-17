@@ -2,9 +2,11 @@ from fastapi import FastAPI, HTTPException
 import os
 import uuid
 import json
+import subprocess
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from pptx import Presentation  # Importando a biblioteca pptx
 
 app = FastAPI()
 
@@ -20,16 +22,15 @@ sheets_service = build('sheets', 'v4', credentials=credentials)
 #-----------------------------------------------------DOCX-------------------------------------------
 # Função para upload de um arquivo .docx para o Google Drive
 def upload_docx_to_drive(file_path, file_name):
-
     file_metadata = {
         'name': file_name,
         'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     }
     media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    
+
     # Logando o upload
     print(f"Fazendo upload do arquivo: {file_path}")
-    
+
     file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
     file_id = file.get('id')
 
@@ -39,13 +40,13 @@ def upload_docx_to_drive(file_path, file_name):
         'role': 'reader',
     }
     drive_service.permissions().create(fileId=file_id, body=permission).execute()
-    
+
     return file_id
 
 # Endpoint para salvar um arquivo .docx
 @app.post("/save_docx/")
 async def save_docx(code: str):
-   # Gera um nome de arquivo aleatório usando UUID
+    # Gera um nome de arquivo aleatório usando UUID
     file_name = f"{uuid.uuid4()}.py"
     temp_file_path = f"./{file_name}"  # Caminho do arquivo temporário no Railway
 
@@ -68,12 +69,12 @@ async def save_docx(code: str):
         # Verifica se o arquivo DOCX foi realmente gerado
         if not os.path.exists(docx_file_path):
             raise HTTPException(status_code=404, detail="Arquivo DOCX não encontrado após execução do script.")
-        
+
         print("Arquivo DOCX encontrado:", docx_file_path)
 
         # Faz upload do arquivo DOCX para o Google Drive
-        file_id = upload_to_drive(docx_file_path, os.path.basename(docx_file_path))
-        
+        file_id = upload_docx_to_drive(docx_file_path, os.path.basename(docx_file_path))
+
         # Construindo o link para o arquivo no Google Drive
         file_link = f"https://drive.google.com/file/d/{file_id}/view"
 
@@ -82,7 +83,7 @@ async def save_docx(code: str):
     except Exception as e:
         print("Erro encontrado:", str(e))  # Logando o erro
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-    
+
     finally:
         # Remove o arquivo temporário do script Python gerado após a execução
         if os.path.exists(temp_file_path):
@@ -97,7 +98,7 @@ def create_google_sheet(sheet_name):
             'title': sheet_name
         }
     }
-    
+
     sheet = sheets_service.spreadsheets().create(body=sheet_metadata, fields='spreadsheetId').execute()
     sheet_id = sheet.get('spreadsheetId')
 
@@ -112,15 +113,66 @@ def create_google_sheet(sheet_name):
 # Endpoint para criar uma planilha Google Sheets
 @app.post("/create_sheet/")
 async def create_sheet(sheet_name: str):
-    """
-    Cria uma planilha no Google Sheets e retorna o link para acesso.
-    """
     try:
         # Cria uma planilha no Google Sheets
         sheet_id = create_google_sheet(sheet_name)
         file_link = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
-        
+
         return {"message": "Planilha Google Sheets criada com sucesso!", "file_link": file_link}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+#-----------------------------------------------------PPTX-------------------------------------------
+# Função para criar um arquivo PowerPoint
+def create_powerpoint(title: str, content: str):
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[5])  # Usar layout de slide em branco
+    title_box = slide.shapes.title
+    content_box = slide.shapes.add_textbox(left=0, top=0, width=Inches(10), height=Inches(7))
+
+    title_box.text = title
+    content_box.text = content
+    pptx_file_path = "apresentacao.pptx"
+    presentation.save(pptx_file_path)
+    return pptx_file_path
+
+# Função para upload de um arquivo .pptx para o Google Drive
+def upload_pptx_to_drive(file_path, file_name):
+    file_metadata = {
+        'name': file_name,
+        'mimeType': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    }
+    media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation')
+
+    print(f"Fazendo upload do arquivo: {file_path}")
+    
+    file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    file_id = file.get('id')
+
+    # Tornar o arquivo público
+    permission = {
+        'type': 'anyone',
+        'role': 'reader',
+    }
+    drive_service.permissions().create(fileId=file_id, body=permission).execute()
+
+    return file_id
+
+# Endpoint para criar um arquivo PPTX
+@app.post("/create_pptx/")
+async def create_pptx(title: str, content: str):
+    try:
+        # Cria a apresentação PowerPoint
+        pptx_file_path = create_powerpoint(title, content)
+        
+        # Faz upload do arquivo PPTX para o Google Drive
+        file_id = upload_pptx_to_drive(pptx_file_path, os.path.basename(pptx_file_path))
+
+        # Construindo o link para o arquivo no Google Drive
+        file_link = f"https://drive.google.com/file/d/{file_id}/view"
+
+        return {"message": "Apresentação PowerPoint criada e enviada com sucesso!", "file_link": file_link}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
