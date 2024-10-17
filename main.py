@@ -124,19 +124,6 @@ async def create_sheet(sheet_name: str):
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
 #-----------------------------------------------------PPTX-------------------------------------------
-# Função para criar um arquivo PowerPoint
-def create_powerpoint(title: str, content: str):
-    presentation = Presentation()
-    slide = presentation.slides.add_slide(presentation.slide_layouts[5])  # Usar layout de slide em branco
-    title_box = slide.shapes.title
-    content_box = slide.shapes.add_textbox(left=0, top=0, width=Inches(10), height=Inches(7))
-
-    title_box.text = title
-    content_box.text = content
-    pptx_file_path = "apresentacao.pptx"
-    presentation.save(pptx_file_path)
-    return pptx_file_path
-
 # Função para upload de um arquivo .pptx para o Google Drive
 def upload_pptx_to_drive(file_path, file_name):
     file_metadata = {
@@ -145,8 +132,9 @@ def upload_pptx_to_drive(file_path, file_name):
     }
     media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation')
 
+    # Logando o upload
     print(f"Fazendo upload do arquivo: {file_path}")
-    
+
     file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
     file_id = file.get('id')
 
@@ -159,20 +147,51 @@ def upload_pptx_to_drive(file_path, file_name):
 
     return file_id
 
-# Endpoint para criar um arquivo PPTX
-@app.post("/create_pptx/")
-async def create_pptx(title: str, content: str):
+# Função para criar um arquivo PowerPoint (pptx)
+def create_pptx(title: str, content: str, file_name: str):
+    presentation = Presentation()
+    slide_layout = presentation.slide_layouts[0]  # Layout padrão com título e conteúdo
+    slide = presentation.slides.add_slide(slide_layout)
+    
+    # Adicionando título e conteúdo
+    title_box = slide.shapes.title
+    content_box = slide.shapes.placeholders[1]
+    title_box.text = title
+    content_box.text = content
+
+    # Salvando o arquivo PPTX
+    pptx_file_path = f"./{file_name}.pptx"
+    presentation.save(pptx_file_path)
+    
+    return pptx_file_path
+
+# Endpoint para salvar um arquivo .pptx com nome dinâmico
+@app.post("/save_pptx/")
+async def save_pptx(title: str, content: str, file_name: str):
     try:
-        # Cria a apresentação PowerPoint
-        pptx_file_path = create_powerpoint(title, content)
+        # Cria o arquivo PPTX com título e conteúdo fornecidos
+        pptx_file_path = create_pptx(title, content, file_name)
         
+        # Verifica se o arquivo PPTX foi realmente gerado
+        if not os.path.exists(pptx_file_path):
+            raise HTTPException(status_code=404, detail="Arquivo PPTX não encontrado após criação.")
+
+        print("Arquivo PPTX encontrado:", pptx_file_path)
+
         # Faz upload do arquivo PPTX para o Google Drive
-        file_id = upload_pptx_to_drive(pptx_file_path, os.path.basename(pptx_file_path))
+        file_id = upload_pptx_to_drive(pptx_file_path, file_name)
 
         # Construindo o link para o arquivo no Google Drive
         file_link = f"https://drive.google.com/file/d/{file_id}/view"
 
-        return {"message": "Apresentação PowerPoint criada e enviada com sucesso!", "file_link": file_link}
+        return {"message": "Apresentação criada e enviada com sucesso!", "file_link": file_link}
 
     except Exception as e:
+        print("Erro encontrado:", str(e))  # Logando o erro
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+    finally:
+        # Remove o arquivo temporário do PPTX gerado
+        if os.path.exists(pptx_file_path):
+            print("Removendo arquivo PPTX temporário:", pptx_file_path)
+            os.remove(pptx_file_path)
