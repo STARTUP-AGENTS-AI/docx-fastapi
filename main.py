@@ -7,6 +7,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from pptx import Presentation  # Importando a biblioteca pptx
+from pptx.util import Inches  # Importando Inches do pptx.util
 
 app = FastAPI()
 
