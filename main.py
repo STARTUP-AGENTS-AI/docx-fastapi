@@ -17,6 +17,7 @@ credentials = service_account.Credentials.from_service_account_info(service_acco
 drive_service = build('drive', 'v3', credentials=credentials)
 sheets_service = build('sheets', 'v4', credentials=credentials)
 
+# Função para upload de um arquivo .docx para o Google Drive
 def upload_docx_to_drive(file_path, file_name):
     file_metadata = {
         'name': file_name,
@@ -35,8 +36,8 @@ def upload_docx_to_drive(file_path, file_name):
     
     return file_id
 
+# Função para criar uma planilha no Google Sheets
 def create_google_sheet(sheet_name):
-    # Criação de uma planilha
     sheet_metadata = {
         'properties': {
             'title': sheet_name
@@ -54,10 +55,11 @@ def create_google_sheet(sheet_name):
 
     return sheet_id
 
-@app.post("/save_script/")
-async def save_script(code: str, output_type: str):
+# Endpoint para salvar um arquivo .docx
+@app.post("/save_docx/")
+async def save_docx(code: str):
     """
-    output_type: 'docx' ou 'sheet' para definir o tipo de arquivo a ser criado.
+    Salva o código em um arquivo .docx e faz upload para o Google Drive.
     """
     try:
         # Gera um nome de arquivo aleatório usando UUID
@@ -74,29 +76,17 @@ async def save_script(code: str, output_type: str):
         if result.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Erro ao executar o script: {result.stderr}")
 
-        # Escolhe o tipo de arquivo para ser criado (docx ou sheet)
-        if output_type == 'docx':
-            # Caminho do arquivo DOCX gerado
-            docx_file_path = "./documento_revolucao_francesa.docx"
+        # Caminho do arquivo DOCX gerado
+        docx_file_path = "./documento_revolucao_francesa.docx"
 
-            if not os.path.exists(docx_file_path):
-                raise HTTPException(status_code=404, detail="Arquivo DOCX não encontrado após execução do script.")
+        if not os.path.exists(docx_file_path):
+            raise HTTPException(status_code=404, detail="Arquivo DOCX não encontrado após execução do script.")
 
-            # Faz upload do arquivo DOCX para o Google Drive
-            file_id = upload_docx_to_drive(docx_file_path, "documento_revolucao_francesa.docx")
-            file_link = f"https://drive.google.com/file/d/{file_id}/view"
-            message = "Documento .docx criado e enviado com sucesso!"
+        # Faz upload do arquivo DOCX para o Google Drive
+        file_id = upload_docx_to_drive(docx_file_path, "documento_revolucao_francesa.docx")
+        file_link = f"https://drive.google.com/file/d/{file_id}/view"
 
-        elif output_type == 'sheet':
-            # Cria uma planilha no Google Sheets
-            sheet_id = create_google_sheet("Planilha de Exemplo")
-            file_link = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
-            message = "Planilha Google Sheets criada com sucesso!"
-
-        else:
-            raise HTTPException(status_code=400, detail="Tipo de saída inválido. Use 'docx' ou 'sheet'.")
-
-        return {"message": message, "file_link": file_link}
+        return {"message": "Documento .docx criado e enviado com sucesso!", "file_link": file_link}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
@@ -105,3 +95,19 @@ async def save_script(code: str, output_type: str):
         # Remove o arquivo temporário do script Python gerado após a execução
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+# Endpoint para criar uma planilha Google Sheets
+@app.post("/create_sheet/")
+async def create_sheet(sheet_name: str):
+    """
+    Cria uma planilha no Google Sheets e retorna o link para acesso.
+    """
+    try:
+        # Cria uma planilha no Google Sheets
+        sheet_id = create_google_sheet(sheet_name)
+        file_link = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
+        
+        return {"message": "Planilha Google Sheets criada com sucesso!", "file_link": file_link}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
