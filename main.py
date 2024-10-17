@@ -15,14 +15,10 @@ service_account_info = json.loads(os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON'))
 
 # Cria as credenciais a partir do dicionário
 credentials = service_account.Credentials.from_service_account_info(service_account_info)
-
 drive_service = build('drive', 'v3', credentials=credentials)
 
 def upload_to_drive(file_path, file_name):
-    file_metadata = {
-        'name': file_name,
-        'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'  # Tipo MIME para DOCX
-    }
+    file_metadata = {'name': file_name, 'mimeType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
     media = MediaFileUpload(file_path, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
     return file.get('id')
@@ -34,12 +30,9 @@ async def save_script(code: str):
     temp_file_path = f"./{file_name}"  # Caminho do arquivo temporário no Railway
 
     try:
-        # Recupera a formatação do código
-        formatted_code = '\n'.join(code.splitlines())
-
-        # Salva o código formatado no arquivo temporário
+        # Salva o código em uma única linha
         with open(temp_file_path, "w") as temp_file:
-            temp_file.write(formatted_code)
+            temp_file.write(code.replace("\\n", ";"))  # Usa `;` para separar comandos
 
         # Executa o script
         result = subprocess.run(['python3', temp_file_path], capture_output=True, text=True)
