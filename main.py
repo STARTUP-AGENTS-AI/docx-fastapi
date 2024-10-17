@@ -34,9 +34,12 @@ async def save_script(code: str):
     temp_file_path = f"./{file_name}"  # Caminho do arquivo temporário no Railway
 
     try:
-        # Salva o código no arquivo temporário
+        # Recupera a formatação do código
+        formatted_code = '\n'.join(code.splitlines())
+
+        # Salva o código formatado no arquivo temporário
         with open(temp_file_path, "w") as temp_file:
-            temp_file.write(code)
+            temp_file.write(formatted_code)
 
         # Executa o script
         result = subprocess.run(['python3', temp_file_path], capture_output=True, text=True)
@@ -45,7 +48,7 @@ async def save_script(code: str):
             raise HTTPException(status_code=500, detail=f"Erro ao executar o script: {result.stderr}")
 
         # Corrige o caminho do arquivo DOCX gerado pelo script
-        docx_file_path = "/tmp/documento_revolucao_francesa.docx"  # Certifique-se de que o arquivo foi salvo em /tmp/
+        docx_file_path = "./documento_revolucao_francesa.docx"  # Certifique-se de que o arquivo foi salvo corretamente
 
         # Verifica se o arquivo DOCX foi realmente gerado
         if not os.path.exists(docx_file_path):
