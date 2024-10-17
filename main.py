@@ -28,7 +28,16 @@ def upload_to_drive(file_path, file_name):
     print(f"Fazendo upload do arquivo: {file_path}")
     
     file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    return file.get('id')
+    file_id = file.get('id')
+
+    # Tornar o arquivo público
+    permission = {
+        'type': 'anyone',
+        'role': 'reader',
+    }
+    drive_service.permissions().create(fileId=file_id, body=permission).execute()
+    
+    return file_id
 
 @app.post("/save_script/")
 async def save_script(code: str):
